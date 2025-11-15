@@ -3,6 +3,7 @@ import json
 import pandas as pd
 from datetime import datetime, timezone
 
+
 def normalize_timestamp(timestamp):
     try:
         # Case 1: Check if it's a Unix timestamp in milliseconds or seconds      
@@ -28,7 +29,8 @@ def normalize_timestamp(timestamp):
     except Exception as e:
         print(f"Error normalizing timestamp: {e}")
         return None
-    
+
+
 def parse_labels(json_file, folder_path):
     with open(os.path.join(folder_path, json_file), 'r') as file:
         data = json.load(file)
@@ -78,10 +80,8 @@ def parse_labels(json_file, folder_path):
     return folder_dict
 
 
-if __name__ == "__main__":
-    data_path = 'c:/msc_2/DL/vitmma19-pw-bullflag/data'
-
-    folders = os.listdir(f'{data_path}')
+def get_data_with_labels(data_path):
+    folders = os.listdir(data_path)
     folders.remove('consensus')
     folders.remove('sample')
 
@@ -112,8 +112,6 @@ if __name__ == "__main__":
             # Add the folder's data to the main dictionary
             all_labels[folder] = folder_dict
 
-    # all_labels save() ?
-
     data_with_labels = {}
 
     for folder, files in all_labels.items():
@@ -128,7 +126,5 @@ if __name__ == "__main__":
                     'data': data,
                     'labels': labels
                 }
-            # else:
-            #     print(f"File not found: {file_path}")
 
-    # data_with_labels save() ?
+    return data_with_labels
