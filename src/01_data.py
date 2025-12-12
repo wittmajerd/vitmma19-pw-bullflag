@@ -372,7 +372,7 @@ def save_processed_data(
 def main():
     # download_and_extract_data()  # implement if needed
 
-    data_path = Path(__file__).parent / "data"
+    data_path = Path(__file__).parent.parent / "data"
 
     folders = os.listdir(data_path)
     if 'consensus' in folders:
