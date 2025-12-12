@@ -63,7 +63,8 @@ def normalize_data(df: pd.DataFrame) -> tuple[pd.DataFrame, bool]:
     return df
 
 
-def parse_labels(json_file, folder_path):
+def parse_labels(json_file: str, folder_path: str) -> dict[str, List[Dict[str, any]]]:
+    """Load labels from a JSON export, arrange them in a dictionary and normalize timestamps per file."""
     with open(os.path.join(folder_path, json_file), 'r', encoding='utf-8') as file:
         data = json.load(file)
 
@@ -112,13 +113,8 @@ def parse_labels(json_file, folder_path):
     return folder_dict
 
 
-def get_raw_data_with_labels(data_path):
-    folders = os.listdir(data_path)
-    if 'consensus' in folders:
-        folders.remove('consensus')
-    if 'sample' in folders:
-        folders.remove('sample')
-
+def get_parsed_labels(data_path: str, folders: List[str]) -> dict[str, dict[str, List[Dict[str, any]]]]:
+    """ Parse labels from all folders and return a nested dictionary."""
     all_labels = {}
     for folder in folders:
         folder_path = os.path.join(data_path, folder)
@@ -145,7 +141,10 @@ def get_raw_data_with_labels(data_path):
 
             # Add the folder's data to the main dictionary
             all_labels[folder] = folder_dict
+    
+    return all_labels
 
+def get_data_with_labels(data_path: str, all_labels: dict[str, dict[str, List[Dict[str, any]]]]) -> dict[str, dict[str, any]]:
     data_with_labels = {}
 
     for folder, files in all_labels.items():
@@ -154,9 +153,7 @@ def get_raw_data_with_labels(data_path):
             file_path = os.path.join(folder_path, file_name)
             if os.path.exists(file_path):
                 data = pd.read_csv(file_path)
-
                 data = normalize_data(data)
-
                 # Attach the labels to the data
                 key = f"{folder}/{file_name}"
                 data_with_labels[key] = {
@@ -191,6 +188,16 @@ def label_ohlc_df(
         df.loc[mask, target_col] = cls_id
 
     return df
+
+
+def trim_after_last_label(df: pd.DataFrame, label_col: str = "flag_label", margin: int = 64, label_map: dict[str, int] = None) -> pd.DataFrame:
+    if df.shape[0] < 10000:
+        return df
+    
+    mask = df[label_col] != label_map["No Flag"]
+    last_labeled_idx = mask.to_numpy().nonzero()[0][-1]
+    end_idx = min(len(df), last_labeled_idx + margin)
+    return df.iloc[:end_idx].reset_index(drop=True)
 
 
 def split_time_series(
@@ -244,8 +251,8 @@ def normalize_splits(
     return normalized, scaler
 
 
-def save_processed_data(
-        data_path = Path("C:/msc_2/DL/vitmma19-pw-bullflag/data"),
+def process_data(
+        data_with_labels,
         window_size = 32,
         step = 1,
         train_ratio = 0.7,
@@ -264,8 +271,6 @@ def save_processed_data(
 
     features = ['open', 'high', 'low', 'close']
     
-    data_with_labels = get_raw_data_with_labels(data_path)
-
     window_arrays = {
         "train_X": [],
         "train_y": [],
@@ -288,6 +293,8 @@ def save_processed_data(
         if len(labeled_df["flag_label"].unique()) < 2 and labeled_df["flag_label"].unique()[0] == 0:
             print(f"Skip {file_name}: no flag labels present")
             continue
+
+        labeled_df = trim_after_last_label(labeled_df, margin=window_size, label_map=label_map)
 
         df_len = len(labeled_df)
 
@@ -312,6 +319,14 @@ def save_processed_data(
             window_arrays[f"{split_name}_X"].append(X)
             window_arrays[f"{split_name}_y"].append(y)
 
+    return window_arrays
+
+
+def save_processed_data(
+        window_arrays: dict[str, List[np.ndarray]],
+        data_path: Path,
+        filename: str = "processed_data.npz",
+    ):
     stacked_train_X = np.concatenate(window_arrays["train_X"], axis=0)
     stacked_train_y = np.concatenate(window_arrays["train_y"], axis=0)
     # print(stacked_train_X.shape, stacked_train_y.shape)
@@ -325,7 +340,7 @@ def save_processed_data(
     # print(stacked_test_X.shape, stacked_test_y.shape)
 
     np.savez_compressed(
-        data_path / f"processed_data_{window_size}_{step}.npz",
+        data_path / filename,
         train_X=stacked_train_X,
         train_y=stacked_train_y,
         val_X=stacked_val_X,
@@ -333,3 +348,44 @@ def save_processed_data(
         test_X=stacked_test_X,
         test_y=stacked_test_y,
     )
+
+
+# import requests
+# from pathlib import Path
+# from zipfile import ZipFile
+
+# url = "https://bmeedu-my.sharepoint.com/:u:/g/personal/gyires-toth_balint_vik_bme_hu/IQAlEFc87da4SLpRVTCs81KwATOAjf5GzI-IxEED_nGrjh0?e=eGgGec&download=1"
+# out_path = Path("data/archive.zip")
+# out_path.parent.mkdir(parents=True, exist_ok=True)
+
+# with requests.get(url, stream=True) as r:
+#     r.raise_for_status()
+#     with out_path.open("wb") as f:
+#         for chunk in r.iter_content(8192):
+#             f.write(chunk)
+
+# with ZipFile(out_path, "r") as archive:
+#     archive.extractall("data")
+
+
+
+def main():
+    # download_and_extract_data()  # implement if needed
+
+    data_path = Path(__file__).parent / "data"
+
+    folders = os.listdir(data_path)
+    if 'consensus' in folders:
+        folders.remove('consensus')
+    if 'sample' in folders:
+        folders.remove('sample')
+
+    labels = get_parsed_labels(data_path, folders)
+    data_with_labels = get_data_with_labels(data_path, labels)
+    
+    processed_data = process_data(data_with_labels)
+    save_processed_data(processed_data, data_path)
+
+
+if __name__ == "__main__":
+    main()
