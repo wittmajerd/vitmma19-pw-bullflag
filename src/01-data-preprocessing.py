@@ -252,10 +252,10 @@ def normalize_splits(
 
 def process_data(
         data_with_labels,
-        window_size = 32,
-        step = 1,
-        train_ratio = 0.7,
-        val_ratio = 0.15
+        window_size: int = config.WINDOW_SIZE,
+        step: int = config.STEP,
+        train_ratio: float = config.TRAIN_RATIO,
+        val_ratio: float = config.VAL_RATIO,
     ):
     logger.info("Processing data ...")
     
@@ -274,6 +274,7 @@ def process_data(
             logger.info(f"Skip {file_name}: no flag labels present")
             continue
 
+        # lehet ehelyett a végé csak ki kéne dobni a flag nélküli windowok bizonyos arányát
         labeled_df = trim_after_last_label(labeled_df, margin=window_size, label_map=config.LABEL_MAP)
 
         df_len = len(labeled_df)
@@ -349,6 +350,7 @@ def download_and_extract_data(out_path: Path):
 
 
 if __name__ == "__main__":
+    # Ezeket a patheket is config-ba kéne tenni majd dockerben megnézni hogy is van
     parent_path = Path(__file__).parent.parent
     data_path = parent_path / "data"
     output_path = parent_path / "output"
@@ -367,4 +369,4 @@ if __name__ == "__main__":
     data_with_labels = get_data_with_labels(data_path, labels)
     
     processed_data = process_data(data_with_labels)
-    save_processed_data(processed_data, output_path, filename="processed_data.npz")
+    save_processed_data(processed_data, output_path)
