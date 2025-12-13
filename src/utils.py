@@ -1,13 +1,11 @@
-# Utility functions
-# Common helper functions used across the project.
 import logging
 import sys
 
-def setup_logger(name=__name__):
+def setup_logger():
     """
     Sets up a logger that outputs to the console (stdout).
     """
-    logger = logging.getLogger(name)
+    logger = logging.getLogger("DL_Project")
     if not logger.handlers:
         logger.setLevel(logging.INFO)
         handler = logging.StreamHandler(sys.stdout)
@@ -15,6 +13,3 @@ def setup_logger(name=__name__):
         handler.setFormatter(formatter)
         logger.addHandler(handler)
     return logger
-
-def load_config():
-    pass
