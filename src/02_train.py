@@ -1,17 +1,17 @@
 # %%
+from pathlib import Path
+
+import numpy as np
 import torch
 import torch.nn as nn
-
-import torch.nn.functional as F
 import torch.optim as optim
-import numpy as np
-from pathlib import Path
 from sklearn.metrics import f1_score
 from torch.utils.data import DataLoader, TensorDataset
 
-from typing import Callable, Dict, Any
+import config
+from utils import setup_logger
 
-
+logger = setup_logger()
 
 
 class LSTMClassifier(nn.Module):
@@ -75,78 +75,6 @@ class TemporalCNN(nn.Module):
         self.eval()
 
 
-class BiGRUClassifier(nn.Module):
-    """Bidirectional GRU classifier expecting input (B, T, F)."""
-    def __init__(self, input_size: int, num_classes: int, hidden_size: int = 128, num_layers: int = 2, dropout: float = 0.2):
-        super().__init__()
-        self.gru = nn.GRU(
-            input_size=input_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True,
-            bidirectional=True,
-            dropout=dropout if num_layers > 1 else 0.0,
-        )
-        self.fc = nn.Linear(hidden_size * 2, num_classes)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        _, h_n = self.gru(x)
-        h_last = torch.cat((h_n[-2], h_n[-1]), dim=1)
-        return self.fc(h_last)
-
-    def save_model(self, filepath: str):
-        torch.save(self.state_dict(), filepath)
-
-    def load_model(self, filepath: str):
-        self.load_state_dict(torch.load(filepath, map_location="cpu"))
-        self.eval()
-
-
-class TransformerClassifier(nn.Module):
-    """Lightweight Transformer encoder pooling CLS token; input (B, T, F)."""
-    def __init__(
-        self,
-        input_size: int,
-        num_classes: int,
-        d_model: int = 128,
-        nhead: int = 4,
-        num_layers: int = 2,
-        dim_feedforward: int = 256,
-        dropout: float = 0.1,
-    ):
-        super().__init__()
-        self.input_proj = nn.Linear(input_size, d_model)
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=d_model,
-            nhead=nhead,
-            dim_feedforward=dim_feedforward,
-            dropout=dropout,
-            batch_first=True,
-        )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
-        self.cls_token = nn.Parameter(torch.zeros(1, 1, d_model))
-        self.head = nn.Sequential(
-            nn.LayerNorm(d_model),
-            nn.Linear(d_model, num_classes),
-        )
-        nn.init.trunc_normal_(self.cls_token, std=0.02)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        b = x.size(0)
-        cls = self.cls_token.expand(b, -1, -1)
-        x = torch.cat([cls, self.input_proj(x)], dim=1)
-        enc = self.encoder(x)
-        return self.head(enc[:, 0])
-
-    def save_model(self, filepath: str):
-        torch.save(self.state_dict(), filepath)
-
-    def load_model(self, filepath: str):
-        self.load_state_dict(torch.load(filepath, map_location="cpu"))
-        self.eval()
-
-# %%
-
 def build_model(config: dict, n_feats: int, n_classes: int) -> nn.Module:
     model_name = config.get("model_name", "temporal_cnn")
     if model_name not in MODEL_REGISTRY:
@@ -197,9 +125,10 @@ def run_phase(model: nn.Module, loader: DataLoader | None, criterion, device, op
     macro_f1 = f1_score(targets_concat, preds_concat, average="macro")
     return total_loss / total_samples, total_correct / total_samples, macro_f1
 
-def train_and_evaluate(config: dict, processed_file: Path = Path("data/processed_dataset.npz")) -> None:
+def train_and_evaluate(config: dict, output_path: Path, processed_file: str = "processed_dataset.npz") -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    arrays = np.load(processed_file)
+    print(f"Starting training with device: {device}")
+    arrays = np.load(output_path / processed_file)
     n_feats = arrays["train_X"].shape[-1]
     label_arrays = [arrays[k] for k in arrays if k.endswith("_y")]
     num_classes = len(np.unique(np.concatenate(label_arrays)))
@@ -221,12 +150,13 @@ def train_and_evaluate(config: dict, processed_file: Path = Path("data/processed
         if not np.isnan(val_f1) and val_f1 > best_val_f1:
             best_val_f1 = val_f1
             model_name = config.get("model_name", "temporal_cnn")
-            torch.save(model.state_dict(), f"best_model_{model_name}.pt")
+            torch.save(model.state_dict(), output_path / f"best_model_{model_name}.pt")
+            print(f"  Saved best model with val_f1={best_val_f1:.3f} to {output_path / f'best_model_{model_name}.pt'}")
 
     if "test" in loaders:
+        print("Evaluating on test set ...")
         test_loss, test_acc, test_f1 = run_phase(model, loaders["test"], criterion, device)
         print(f"Test  | loss={test_loss:.4f} acc={test_acc:.3f} f1={test_f1:.3f}")
-
 
 
 MODEL_REGISTRY = {
@@ -236,16 +166,6 @@ MODEL_REGISTRY = {
         **cfg,
     ),
     "temporal_cnn": lambda cfg, n_feats, n_classes: TemporalCNN(
-        input_size=n_feats,
-        num_classes=n_classes,
-        **cfg,
-    ),
-    "bigru": lambda cfg, n_feats, n_classes: BiGRUClassifier(
-        input_size=n_feats,
-        num_classes=n_classes,
-        **cfg,
-    ),
-    "transformer": lambda cfg, n_feats, n_classes: TransformerClassifier(
         input_size=n_feats,
         num_classes=n_classes,
         **cfg,
@@ -265,5 +185,6 @@ if __name__ == "__main__":
         "learning_rate": 0.01,
         "num_epochs": 1,
     }
-    data_path = Path(__file__).parent.parent / "data"
-    train_and_evaluate(cfg, data_path / "processed_data2.npz")
+    parent_path = Path(__file__).parent.parent
+    output_path = parent_path / "output"
+    train_and_evaluate(cfg, output_path, "processed_data.npz")
