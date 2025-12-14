@@ -36,7 +36,7 @@ def log_diagnostics(
         labels=labels,
         target_names=target_names,
         digits=3,
-        zero_division=0.0,  # show the warning; don’t drop results
+        zero_division=0.0,
     )
     logger.info("%s classification report:\n%s", name, report)
 
@@ -51,7 +51,7 @@ def log_diagnostics(
     ax.set_xticklabels(target_names, rotation=45, ha="right")
     ax.set_yticks(range(len(labels)))
     ax.set_yticklabels(target_names)
-    ax.xaxis.set_ticks_position("bottom")  # put x-labels at bottom
+    ax.xaxis.set_ticks_position("bottom")
     fig.tight_layout()
     
     if save_dir:
@@ -100,7 +100,7 @@ def evaluate_baselines(
     results: Dict[str, Dict[str, float]] = {}
     majority_class = 0
     label_name_map = {v: k for k, v in getattr(config, "LABEL_MAP", {}).items()}
-    save_dir = Path(getattr(config, "DATA_DIR", "output"))
+    save_dir = Path(getattr(config, "OUTPUT_DIR", "output"))
 
     split = "test"
     x_key, y_key = f"{split}_X", f"{split}_y"
@@ -123,7 +123,6 @@ def evaluate_baselines(
 
     return results
 
-# -----------------------------------------------------------------------------
 def load_model(arrays: Dict[str, np.ndarray], model_path: Path, device: torch.device) -> TemporalCNN:
     n_feats = arrays["test_X"].shape[-1]
     label_arrays = [arrays[k] for k in arrays if k.endswith("_y")]
@@ -149,7 +148,7 @@ def evaluate_model(
     model = load_model(arrays, model_path, device_t)
     results: Dict[str, Dict[str, float]] = {}
     label_name_map = {v: k for k, v in getattr(config, "LABEL_MAP", {}).items()}
-    save_dir = Path(getattr(config, "DATA_DIR", "output"))
+    save_dir = Path(getattr(config, "OUTPUT_DIR", "output"))
 
     split = "test"
     x_key, y_key = f"{split}_X", f"{split}_y"
@@ -167,10 +166,10 @@ def evaluate_model(
 
     return results
 
-# -----------------------------------------------------------------------------
+
 if __name__ == "__main__":
-    data_path = Path(config.DATA_DIR) / "processed_test_data.npz"
-    model_path = Path(config.MODEL_SAVE_PATH)
+    data_path = config.OUTPUT_DIR / "processed_test_data.npz"
+    model_path = config.MODEL_SAVE_PATH
 
     logger.info("Running baselines on %s", data_path)
     base_results = evaluate_baselines(npz_path=data_path)

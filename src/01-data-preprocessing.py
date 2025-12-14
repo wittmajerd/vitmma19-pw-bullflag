@@ -265,8 +265,8 @@ def process_data(
         data = content['data']
         labels = content['labels']
 
+        # Ha már jól működik
         # extended_labels = extend_labels_with_pole(data, labels)
-        # logger.info(f"File: {file_name}, Original labels: {len(labels)}, Extended labels: {len(extended_labels)}")
 
         labeled_df = label_ohlc_df(data, labels, config.LABEL_MAP)
 
@@ -274,7 +274,7 @@ def process_data(
             logger.info(f"Skip {file_name}: no flag labels present")
             continue
 
-        # lehet ehelyett a végé csak ki kéne dobni a flag nélküli windowok bizonyos arányát
+        # A flag nélküli window-k eldobása megoldja ezt a problémát jobban
         labeled_df = trim_after_last_label(labeled_df, margin=window_size, label_map=config.LABEL_MAP)
 
         df_len = len(labeled_df)
@@ -350,15 +350,11 @@ def download_and_extract_data(out_path: Path):
 
 
 if __name__ == "__main__":
-    # Ezeket a patheket is config-ba kéne tenni majd dockerben megnézni hogy is van
-    parent_path = Path(__file__).parent.parent
-    data_path = parent_path / "data"
-    output_path = parent_path / "output"
-    output_path.mkdir(parents=True, exist_ok=True)
+    config.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    download_and_extract_data(data_path / "data.zip")
+    download_and_extract_data(config.DATA_DIR / "data.zip")
 
-    data_path = data_path / "bullflagdetector"
+    data_path = config.DATA_DIR / "bullflagdetector"
     folders = os.listdir(data_path)
     if 'consensus' in folders:
         folders.remove('consensus')
@@ -369,4 +365,4 @@ if __name__ == "__main__":
     data_with_labels = get_data_with_labels(data_path, labels)
     
     processed_data = process_data(data_with_labels)
-    save_processed_data(processed_data, output_path)
+    save_processed_data(processed_data, config.OUTPUT_DIR)

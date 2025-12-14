@@ -1,7 +1,5 @@
 # Deep Learning Class (VITMMA19) Project Work template
 
-[Complete the missing parts and delete the instruction parts before uploading.]
-
 ## Project Details
 
 ### Project Information
@@ -12,13 +10,11 @@
 
 ### Solution Description
 
-[Provide a short textual description of the solution here. Explain the problem, the model architecture chosen, the training methodology, and the results.]
-
+The goal is to detect bull-flag patterns in time-series price data. The pipeline automatically downloads the required datasets into `data/`, slices each series into fixed-length windows, and classifies the final candle of each window. A lightweight 1D convolutional classifier was chosen for speed while retaining strong pattern recognition; training is supervised with standard train/validation splits and evaluated on held-out windows. Results include accuracy and F1 score, plus saved model weights for reuse.
 
 ### Docker Instructions
 
 This project is containerized using Docker. Follow the instructions below to build and run the solution.
-[Adjust the commands that show how do build your container and run it with log output.]
 
 #### Build
 
@@ -45,8 +41,6 @@ docker run -v /absolute/path/to/your/local/data:/app/data dl-project > log/run.l
 
 ### File Structure and Functions
 
-[Update according to the final file structure.]
-
 The repository is structured as follows:
 
 - **`src/`**: Contains the source code for the machine learning pipeline.
@@ -57,8 +51,8 @@ The repository is structured as follows:
     - `utils.py`: Helper functions and utilities used across different scripts.
 
 - **`notebook/`**: Contains Jupyter notebooks for analysis and experimentation.
-    - `01-data-exploration.ipynb`: Notebook for initial exploratory data analysis (EDA) and visualization.
-    - `02-label-analysis.ipynb`: Notebook for analyzing the distribution and properties of the target labels.
+    - `data_exploration.ipynb`: Notebook for initial exploratory data analysis (EDA) and visualization.
+    - `data_preprocessing.ipynb`: Notebook for testing preprocessing steps.
 
 - **`log/`**: Contains log files.
     - `run.log`: Example log file showing the output of a successful training run.

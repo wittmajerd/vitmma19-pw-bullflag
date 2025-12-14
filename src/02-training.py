@@ -127,9 +127,8 @@ def train_and_evaluate() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
-    data_path = Path(config.DATA_DIR)
+    data_path = Path(config.OUTPUT_DIR)
     npz_path = data_path / "processed_train_data.npz"
-    # print(npz_path)
     arrays = np.load(npz_path)
     arrays_npz = np.load(npz_path)
     arrays = {k: arrays_npz[k] for k in arrays_npz}
